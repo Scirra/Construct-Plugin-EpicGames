@@ -1,0 +1,173 @@
+﻿{
+	"epic-games": {
+		"conditions": [
+			{
+				"id": "is-available",
+				"scriptName": "IsAvailable"
+			}, {
+				"id": "is-epic-launcher",
+				"scriptName": "IsEpicLauncher"
+			}
+		],
+		"actions": [
+		],
+		"expressions": [
+		]
+	},
+	"authentication": {
+		"conditions": [
+			{
+				"id": "on-login-complete",
+				"scriptName": "OnLoginComplete",
+				"isTrigger": true
+			}, {
+				"id": "on-login-failed",
+				"scriptName": "OnLoginFailed",
+				"isTrigger": true
+			}, {
+				"id": "on-logout-complete",
+				"scriptName": "OnLogoutComplete",
+				"isTrigger": true
+			}, {
+				"id": "on-logout-failed",
+				"scriptName": "OnLogoutFailed",
+				"isTrigger": true
+			}, {
+				"id": "compare-login-type",
+				"scriptName": "CompareLoginType",
+				"params": [
+					{
+						"id": "login-type",
+						"type": "combo",
+						"items": ["portal", "persistent", "exchange-code", "dev-auth-tool"]
+					}
+				]
+			}, {
+				"id": "on-login-status-changed",
+				"scriptName": "OnLoginStatusChanged",
+				"isTrigger": true
+			}
+		],
+		"actions": [
+			{
+				"id": "log-in-portal",
+				"scriptName": "LogInPortal",
+				"isAsync": true
+			}, {
+				"id": "log-in-persistent",
+				"scriptName": "LogInPersistent",
+				"isAsync": true
+			}, {
+				"id": "log-in-exchange-code",
+				"scriptName": "LogInExchangeCode",
+				"isAsync": true,
+				"params": [
+					{ "id": "exchange-code", "type": "string" }
+				]
+			}, {
+				"id": "log-in-devauthtool",
+				"scriptName": "LogInDevAuthTool",
+				"isAsync": true,
+				"params": [
+					{ "id": "host", "type": "string", "initialValue": "\"localhost:6547\"" },
+					{ "id": "credential-name", "type": "string" }
+				]
+			}, {
+				"id": "log-out",
+				"scriptName": "LogOut",
+				"isAsync": true
+			}
+		],
+		"expressions": [
+			{
+				"id": "login-status",
+				"expressionName": "LoginStatus",
+				"returnType": "string"
+			}, {
+				"id": "launcher-exchange-code",
+				"expressionName": "LauncherExchangeCode",
+				"returnType": "string"
+			}
+		]
+	},
+	"user-details": {
+		"conditions": [
+		],
+		"actions": [
+		],
+		"expressions": [
+			{
+				"id": "epic-account-id-str",
+				"expressionName": "EpicAccountIdStr",
+				"returnType": "string"
+			}, {
+				"id": "display-name",
+				"expressionName": "DisplayName",
+				"returnType": "string"
+			}, {
+				"id": "display-name-sanitized",
+				"expressionName": "DisplayNameSanitized",
+				"returnType": "string"
+			}, {
+				"id": "nickname",
+				"expressionName": "Nickname",
+				"returnType": "string"
+			}, {
+				"id": "preferred-language",
+				"expressionName": "PreferredLanguage",
+				"returnType": "string"
+			}, {
+				"id": "user-country",
+				"expressionName": "UserCountry",
+				"returnType": "string"
+			}
+		]
+	},
+	"stats-achievements": {
+		"conditions": [
+			{
+				"id": "on-any-achievement-unlock-success",
+				"scriptName": "OnAnyAchievementUnlockSuccess",
+				"isTrigger": true
+			}, {
+				"id": "on-achievement-unlock-success",
+				"scriptName": "OnAchievementUnlockSuccess",
+				"isTrigger": true,
+				"params": [{
+					"id": "achievement",
+					"type": "string"
+				}]
+			}, {
+				"id": "on-any-achievement-unlock-error",
+				"scriptName": "OnAnyAchievementUnlockError",
+				"isTrigger": true
+			}, {
+				"id": "on-achievement-unlock-error",
+				"scriptName": "OnAchievementUnlockError",
+				"isTrigger": true,
+				"params": [{
+					"id": "achievement",
+					"type": "string"
+				}]
+			}
+		],
+		"actions": [
+			{
+				"id": "unlock-achievement",
+				"scriptName": "UnlockAchievement",
+				"isAsync": true,
+				"params": [{
+					"id": "achievement",
+					"type": "string"
+				}]
+			}
+		],
+		"expressions": [
+			{
+				"id": "achievement",
+				"expressionName": "Achievement",
+				"returnType": "string"
+			}
+		]
+	}
+}

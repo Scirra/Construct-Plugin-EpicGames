@@ -1,0 +1,35 @@
+﻿{
+	"is-c3-addon": true,
+	"type": "plugin",
+	"name": "Epic Games (WebView2)",
+	"id": "EpicGames_Ext",
+	"version": "1.0.0.0",
+	"author": "Scirra",
+	"website": "https://www.construct.net",
+	"documentation": "https://www.construct.net",
+	"description": "Access Epic Games features in the WebView2 export option.",
+	"editor-scripts": [
+						"plugin.js",
+						"type.js",
+						"instance.js"
+					],
+	"file-list": [
+		"c3runtime/plugin.js",
+		"c3runtime/type.js",
+		"c3runtime/instance.js",
+		"c3runtime/conditions.js",
+		"c3runtime/actions.js",
+		"c3runtime/expressions.js",
+		"lang/en-US.json",
+		"aces.json",
+		"addon.json",
+		"icon.svg",
+		"instance.js",
+		"plugin.js",
+		"type.js",
+		"EOSSDK-Win32-Shipping.dll",
+		"EOSSDK-Win64-Shipping.dll",
+		"EpicGames_x86.ext.dll",
+		"EpicGames_x64.ext.dll"
+	]
+}

@@ -1,0 +1,251 @@
+﻿{
+	"languageTag": "en-US",
+	"fileDescription": "Strings for the Epic Games for WebView2 plugin.",
+	"text": {
+		"plugins": {
+			"epicgames_ext": {
+				"name": "Epic Games (WebView2)",
+				"description": "Access Epic Games features in the WebView2 export option.",
+				"help-url": "https://www.construct.net/en/make-games/addons/1106/epic-games-webview2/documentation",
+				"properties": {
+					"product-name": {
+						"name": "Product name",
+						"desc": "The product name to use for Epic Games. Leave empty to use project name."
+					},
+					"product-version": {
+						"name": "Product version",
+						"desc": "The product version to use for Epic Games. Leave empty to use project version."
+					},
+					"sdk-settings": {
+						"name": "SDK settings",
+						"desc": "Settings relating to the configuration of the Epic Games SDK."
+					},
+					"product-id": {
+						"name": "Product ID",
+						"desc": "The product ID from the Developer Portal."
+					},
+					"client-id": {
+						"name": "Client ID",
+						"desc": "The client ID from the Developer Portal."
+					},
+					"client-secret": {
+						"name": "Client secret",
+						"desc": "The client secret from the Developer Portal."
+					},
+					"sandbox-id": {
+						"name": "Sandbox ID",
+						"desc": "The sandbox ID from the Developer Portal."
+					},
+					"deployment-id": {
+						"name": "Deployment ID",
+						"desc": "The deployment ID from the Developer Portal."
+					},
+					"auth-scope": {
+						"name": "Authentication scope",
+						"desc": "The authentication scope flags to request on login. Must match application permissions."
+					},
+					"scope-basic-profile": {
+						"name": "Basic profile",
+						"desc": "Request basic profile scope. (Must match application permissions.)"
+					},
+					"scope-friends-list": {
+						"name": "Friends list",
+						"desc": "Request friends list scope. (Must match application permissions.)"
+					},
+					"scope-presence": {
+						"name": "Presence",
+						"desc": "Request presence scope. (Must match application permissions.)"
+					},
+					"scope-country": {
+						"name": "Country",
+						"desc": "Request country scope. (Must match application permissions.)"
+					}
+				},
+				"aceCategories": {
+					"epic-games": "Epic Games",
+					"authentication": "Authentication",
+					"user-details": "User details",
+					"stats-achievements": "Stats & achievements"
+				},
+				"conditions": {
+					"is-available": {
+						"list-name": "Is available",
+						"display-text": "Is available",
+						"description": "True if successfully initialized the Epic Games API."
+					},
+					"is-epic-launcher": {
+						"list-name": "Is Epic launcher",
+						"display-text": "Is Epic launcher",
+						"description": "True when started by the Epic Games launcher."
+					},
+					"on-login-complete": {
+						"list-name": "On login complete",
+						"display-text": "On login complete",
+						"description": "Triggered after a successful login."
+					},
+					"on-login-failed": {
+						"list-name": "On login failed",
+						"display-text": "On login failed",
+						"description": "Triggered after a login attempt fails."
+					},
+					"on-logout-complete": {
+						"list-name": "On logout complete",
+						"display-text": "On logout complete",
+						"description": "Triggered after a successful logout."
+					},
+					"on-logout-failed": {
+						"list-name": "On logout failed",
+						"display-text": "On logout failed",
+						"description": "Triggered after a logout attempt fails."
+					},
+					"compare-login-type": {
+						"list-name": "Compare login type",
+						"display-text": "Login type is [b]{0}[/b]",
+						"description": "Test which type of login is in use.",
+						"params": {
+							"login-type": {
+								"name": "Login type",
+								"desc": "The login type to check if in use.",
+								"items": {
+									"portal": "Portal",
+									"persistent": "Persistent",
+									"exchange-code": "Exchange code",
+									"dev-auth-tool": "DevAuthTool"
+								}
+							}
+						}
+					},
+					"on-login-status-changed": {
+						"list-name": "On login status changed",
+						"display-text": "On login status changed",
+						"description": "Triggered when the current user's login status changes."
+					},
+					"on-any-achievement-unlock-success": {
+						"list-name": "On any achievement unlock success",
+						"display-text": "On any achievement unlock success",
+						"description": "Triggered after any successful 'Unlock achievement' action."
+					},
+					"on-achievement-unlock-success": {
+						"list-name": "On achievement unlock success",
+						"display-text": "On achievement [i]{0}[/i] unlock success",
+						"description": "Triggered after a successful 'Unlock achievement' action.",
+						"params": {
+							"achievement": {
+								"name": "Achievement",
+								"desc": "The achievement ID."
+							}
+						}
+					},
+					"on-any-achievement-unlock-error": {
+						"list-name": "On any achievement unlock error",
+						"display-text": "On any achievement unlock error",
+						"description": "Triggered after any 'Unlock achievement' action fails."
+					},
+					"on-achievement-unlock-error": {
+						"list-name": "On achievement unlock error",
+						"display-text": "On achievement [i]{0}[/i] unlock error",
+						"description": "Triggered after an 'Unlock achievement' action failed.",
+						"params": {
+							"achievement": {
+								"name": "Achievement",
+								"desc": "The achievement ID."
+							}
+						}
+					}
+				},
+				"actions": {
+					"log-in-portal": {
+						"list-name": "Log in (portal)",
+						"display-text": "Log in (portal)",
+						"description": "Log in using the built-in user onboarding experience provided by the Epic Games SDK."
+					},
+					"log-in-persistent": {
+						"list-name": "Log in (persistent)",
+						"display-text": "Log in (persistent)",
+						"description": "Attempt to automatically log in by using a persisted previous login."
+					},
+					"log-in-exchange-code": {
+						"list-name": "Log in (exchange code)",
+						"display-text": "Log in (exchange code [i]{0}[/i])",
+						"description": "Log in using an exchange code. Allows automatic login with the launcher exchange code.",
+						"params": {
+							"exchange-code": {
+								"name": "Exchange code",
+								"desc": "The exchange code to use for login."
+							}
+						}
+					},
+					"log-in-devauthtool": {
+						"list-name": "Log in (DevAuthTool)",
+						"display-text": "Log in (DevAuthTool at [i]{0}[/i], credential name [i]{1}[/i])",
+						"description": "Log in using DevAuthTool provided in the Epic Games SDK for development/testing purposes.",
+						"params": {
+							"host": {
+								"name": "Host",
+								"desc": "The host that DevAuthTool is running on, e.g. \"localhost:6547\"."
+							},
+							"credential-name": {
+								"name": "Credential name",
+								"desc": "The name of one of the credentials added in DevAuthTool."
+							}
+						}
+					},
+					"log-out": {
+						"list-name": "Log out",
+						"display-text": "Log out",
+						"description": "Log out of the user's currently logged in account."
+					},
+					"unlock-achievement": {
+						"list-name": "Unlock achievement",
+						"display-text": "Unlock achievement [b]{0}[/b]",
+						"description": "Unlock an achievement for the current game.",
+						"params": {
+							"achievement": {
+								"name": "Achievement",
+								"desc": "The achievement ID."
+							}
+						}
+					}
+				},
+				"expressions": {
+					"login-status": {
+						"description": "The current login status as a string.",
+						"translated-name": "LoginStatus"
+					},
+					"launcher-exchange-code": {
+						"description": "Exchange code allowing for automatic login with Epic Games launcher.",
+						"translated-name": "LauncherExchangeCode"
+					},
+					"epic-account-id-str": {
+						"description": "The current user's Epic account ID as a string.",
+						"translated-name": "EpicAccountIdStr"
+					},
+					"display-name": {
+						"description": "The current user's display name (if available).",
+						"translated-name": "DisplayName"
+					},
+					"display-name-sanitized": {
+						"description": "The current user's sanitized display name (if available).",
+						"translated-name": "DisplayNameSanitized"
+					},
+					"nickname": {
+						"description": "The current user's nickname/alias (if available).",
+						"translated-name": "Nickname"
+					},
+					"preferred-language": {
+						"description": "The current user's preferred language as an ISO 639 language code (if available).",
+						"translated-name": "PreferredLanguage"
+					},
+					"user-country": {
+						"description": "The current user's country (if available).",
+						"translated-name": "UserCountry"
+					},
+					"achievement": {
+						"description": "In an achievement trigger, the achievement ID.",
+						"translated-name": "Achievement"
+					}
+				}
+			}
+		}
+	}
+}
