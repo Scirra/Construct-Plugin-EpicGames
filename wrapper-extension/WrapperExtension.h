@@ -7,6 +7,7 @@ public:
 	WrapperExtension(IApplication* iApplication_);
 
 	// IExtension overrides
+	void Init();
 	void Release();
 	void OnMainWindowCreated(HWND hWnd_);
 

@@ -51,8 +51,16 @@ WrapperExtension::WrapperExtension(IApplication* iApplication_)
 {
 	OutputDebugString(L"[EpicExt] Loaded extension\n");
 
+	// Tell the host application the SDK version used. Don't change this.
+	iApplication->SetSdkVersion(WRAPPER_EXT_SDK_VERSION);
+
 	// Register the "scirra-epic-games" component for JavaScript messaging
 	iApplication->RegisterComponentId("scirra-epic-games");
+}
+
+void WrapperExtension::Init()
+{
+	// Called during startup after all other extensions have been loaded.
 }
 
 void WrapperExtension::Release()
