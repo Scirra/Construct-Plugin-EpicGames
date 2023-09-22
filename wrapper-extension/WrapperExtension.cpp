@@ -41,13 +41,11 @@ WrapperExtension::WrapperExtension(IApplication* iApplication_)
 	: iApplication(iApplication_),
 	  hWndMain(NULL),
 	  didEpicGamesInitOk(false),
-	  hPlatform(nullptr),
+	  sharedHandles{},
 	  hAuth(nullptr),
 	  hConnect(nullptr),
 	  hUserInfo(nullptr),
-	  hAchievements(nullptr),
-	  epicAccountId(nullptr),
-	  productUserId(nullptr)
+	  hAchievements(nullptr)
 {
 	OutputDebugString(L"[EpicExt] Loaded extension\n");
 
@@ -56,6 +54,10 @@ WrapperExtension::WrapperExtension(IApplication* iApplication_)
 
 	// Register the "scirra-epic-games" component for JavaScript messaging
 	iApplication->RegisterComponentId("scirra-epic-games");
+
+	// Set a shared pointer to the EOS_Shared_Handles struct, so companion plugins
+	// can access the handles created by this extension.
+	iApplication->SetSharedPtr("scirra-epic-games-handles", &sharedHandles);
 }
 
 void WrapperExtension::Init()
@@ -69,10 +71,10 @@ void WrapperExtension::Release()
 
 	if (didEpicGamesInitOk)
 	{
-		if (hPlatform != nullptr)
+		if (sharedHandles.hPlatform != nullptr)
 		{
-			EOS_Platform_Release(hPlatform);
-			hPlatform = nullptr;
+			EOS_Platform_Release(sharedHandles.hPlatform);
+			sharedHandles.hPlatform = nullptr;
 		}
 
 		EOS_EResult shutdownResult = EOS_Shutdown();
@@ -109,8 +111,10 @@ void WrapperExtension::HandleWebMessage(const std::string& messageId, const std:
 	}
 	else if (messageId == "platform-tick")
 	{
-		if (hPlatform != nullptr)
-			EOS_Platform_Tick(hPlatform);
+		if (sharedHandles.hPlatform != nullptr)
+		{
+			EOS_Platform_Tick(sharedHandles.hPlatform);
+		}
 	}
 	else if (messageId == "log-in-portal")
 	{
@@ -270,13 +274,13 @@ void WrapperExtension::OnInitMessage(const std::string& productName, const std::
 		// Note encryption key is not used so it is just set to a dummy value
 		platOpts.EncryptionKey = "1111111111111111111111111111111111111111111111111111111111111111";
 
-		hPlatform = EOS_Platform_Create(&platOpts);
+		sharedHandles.hPlatform = EOS_Platform_Create(&platOpts);
 
 		// Get other interfaces
-		hAuth = EOS_Platform_GetAuthInterface(hPlatform);
-		hConnect = EOS_Platform_GetConnectInterface(hPlatform);
-		hUserInfo = EOS_Platform_GetUserInfoInterface(hPlatform);
-		hAchievements = EOS_Platform_GetAchievementsInterface(hPlatform);
+		hAuth = EOS_Platform_GetAuthInterface(sharedHandles.hPlatform);
+		hConnect = EOS_Platform_GetConnectInterface(sharedHandles.hPlatform);
+		hUserInfo = EOS_Platform_GetUserInfoInterface(sharedHandles.hPlatform);
+		hAchievements = EOS_Platform_GetAchievementsInterface(sharedHandles.hPlatform);
 
 		// Add callbacks
 		EOS_Auth_AddNotifyLoginStatusChangedOptions nlscOpts = {};
@@ -380,7 +384,7 @@ void WrapperExtension::OnLogInPortalCallback(const EOS_Auth_LoginCallbackInfo* D
 
 void WrapperExtension::HandleSuccessfulLogIn(const EOS_Auth_LoginCallbackInfo* Data, double asyncId)
 {
-	epicAccountId = Data->LocalUserId;
+	sharedHandles.epicAccountId = Data->LocalUserId;
 
 	// Convert epic account ID to string
 	std::string epicAccountIdStr(EOS_EPICACCOUNTID_MAX_LENGTH + 1, 0);
@@ -622,7 +626,7 @@ void WrapperExtension::OnLogOutMessage(double asyncId)
 
 	EOS_Auth_LogoutOptions LogoutOptions = {};
 	LogoutOptions.ApiVersion = EOS_AUTH_LOGOUT_API_LATEST;
-	LogoutOptions.LocalUserId = epicAccountId;
+	LogoutOptions.LocalUserId = sharedHandles.epicAccountId;
 
 	ExtCallbackInfo* callbackInfo = new ExtCallbackInfo();
 	callbackInfo->extension = this;
@@ -638,8 +642,8 @@ void WrapperExtension::OnLogOutCallback(const EOS_Auth_LogoutCallbackInfo* Data,
 		OutputDebugString(L"[EpicExt] OnLogOutCallback: success\n");
 
 		// Clear details set when logged in
-		epicAccountId = nullptr;
-		productUserId = nullptr;
+		sharedHandles.epicAccountId = nullptr;
+		sharedHandles.productUserId = nullptr;
 		userDisplayName = "";
 		userDisplayNameSanitized = "";
 		userNickname = "";
@@ -686,7 +690,7 @@ void WrapperExtension::OnUnlockAchievementMessage(const std::string& achievement
 
 	EOS_Achievements_UnlockAchievementsOptions achievementOpts = {};
 	achievementOpts.ApiVersion = EOS_ACHIEVEMENTS_UNLOCKACHIEVEMENTS_API_LATEST;
-	achievementOpts.UserId = productUserId;					// from ConnectLogin()
+	achievementOpts.UserId = sharedHandles.productUserId;			// from ConnectLogin()
 	achievementOpts.AchievementsCount = 1;
 	achievementOpts.AchievementIds = &achievementIdPtr;
 
@@ -737,7 +741,7 @@ void WrapperExtension::ConnectLogin()
 
 	EOS_Auth_CopyIdTokenOptions copyIdTokenOpts = {};
 	copyIdTokenOpts.ApiVersion = EOS_AUTH_COPYIDTOKEN_API_LATEST;
-	copyIdTokenOpts.AccountId = epicAccountId;
+	copyIdTokenOpts.AccountId = sharedHandles.epicAccountId;
 
 	if (EOS_Auth_CopyIdToken(hAuth, &copyIdTokenOpts, &authIdToken) == EOS_EResult::EOS_Success)
 	{
@@ -763,7 +767,7 @@ void WrapperExtension::OnConnectLoginCallback(const EOS_Connect_LoginCallbackInf
 		OutputDebugString(L"[EpicExt] OnConnectLoginCallback: success\n");
 
 		// Save the product user ID for use with achievements
-		productUserId = Data->LocalUserId;
+		sharedHandles.productUserId = Data->LocalUserId;
 	}
 	else
 	{
@@ -776,7 +780,7 @@ void WrapperExtension::OnConnectAuthExpiration(const EOS_Connect_AuthExpirationC
 	OutputDebugString(L"[EpicExt] OnConnectAuthExpiration()\n");
 
 	// If still logged in, start ConnectLogin() again to refresh the product user ID
-	if (epicAccountId != nullptr)
+	if (sharedHandles.epicAccountId != nullptr)
 	{
 		ConnectLogin();
 	}

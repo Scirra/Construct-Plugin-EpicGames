@@ -2,6 +2,13 @@
 #include "IApplication.h"
 #include "IExtension.h"
 
+// Handles shared with other extensions via the shared pointer API
+struct EOS_Shared_Handles {
+	EOS_HPlatform hPlatform;
+	EOS_EpicAccountId epicAccountId;
+	EOS_ProductUserId productUserId;
+};
+
 class WrapperExtension : public IExtension {
 public:
 	WrapperExtension(IApplication* iApplication_);
@@ -50,7 +57,12 @@ protected:
 	HWND hWndMain;
 
 	bool didEpicGamesInitOk;
-	EOS_HPlatform hPlatform;
+
+	// Shared handles that other extensions can access with the
+	// GetSharedPtr API, allowing use of companion plugins which can
+	// access the handles this extension creates.
+	EOS_Shared_Handles sharedHandles;
+
 	EOS_HAuth hAuth;
 	EOS_HConnect hConnect;
 	EOS_HUserInfo hUserInfo;
@@ -64,8 +76,6 @@ protected:
 	std::string deploymentId;
 
 	// Local user information
-	EOS_EpicAccountId epicAccountId;
-	EOS_ProductUserId productUserId;
 	std::string userDisplayName;
 	std::string userDisplayNameSanitized;
 	std::string userNickname;
