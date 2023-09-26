@@ -31,8 +31,27 @@ If you want to create a plugin that makes use of more of the EOS SDK, you'll wan
 - Add features that directly access EOS SDK features, skipping initialization, authentication and shutdown.
 - In Construct, add both this plugin and your companion plugin to your project. This plugin will handle initialization for you and then your plugin will provide additional features.
 
+Note that a companion extension will likely need to use the `EOS_HPlatform`, `EOS_EpicAccountId` and `EOS_ProductUserId` handles to be able to access EOS SDK features re-using the same authentication. To facilitate this, the Epic Games extension has a struct `EOS_Shared_Handles` with some shared handles:
+
+```c++
+struct EOS_Shared_Handles {
+	EOS_HPlatform hPlatform;
+	EOS_EpicAccountId epicAccountId;
+	EOS_ProductUserId productUserId;
+};
+```
+
+It then uses the `SetSharedPtr()` API to share a pointer to this struct with the ID `"scirra-epic-games-handles"`. This means other extensions can access the handles by including that struct definition in their own code, and using the `GetSharedPtr()` API to retrieve the pointer, e.g.:
+
+```c++
+EOS_Shared_Handles* pSharedHandles = static_cast<EOS_Shared_Handles*>(iApplication->GetSharedPtr("scirra-epic-games-handles"));
+
+// now can use pSharedHandles->epicAccountId etc.
+```
+
 > [!NOTE]
-> **TODO:** we likely need to invent a way to globally share the `EOS_HPlatform`, `EOS_EpicAccountId` and `EOS_ProductUserId` for other extensions to be able to access EOS SDK features re-using the same authentication. PRs towards this goal will be  considered.
+> The Epic Games extension sets the pointer in its `WrapperExtension` constructor, but extensions are not loaded in any specific sequence, so you cannot guarantee that your extension will be able to retrieve the shared pointer in its own constructor. Instead you can try to retrieve it in the `Init()` method which runs after all extensions have been loaded, or just try to retrieve it every time it is used.
+
 
 ## Making local modifications
 
