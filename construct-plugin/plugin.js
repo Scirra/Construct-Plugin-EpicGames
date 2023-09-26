@@ -12,7 +12,7 @@ const SDK = self.SDK;
 const PLUGIN_ID = "EpicGames_Ext";
 ////////////////////////////////////////////
 
-const PLUGIN_VERSION = "1.0.0.0";
+const PLUGIN_VERSION = "1.0.1.0";
 const PLUGIN_CATEGORY = "platform-specific";
 
 const PLUGIN_CLASS = SDK.Plugins.EpicGames_Ext = class EpicGames_Ext extends SDK.IPluginBase
