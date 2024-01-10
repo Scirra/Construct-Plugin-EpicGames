@@ -1,4 +1,6 @@
 ﻿{
+	"$schema": "../../plugin.lang.schema.json",
+
 	"languageTag": "en-US",
 	"fileDescription": "Strings for the Epic Games for WebView2 plugin.",
 	"text": {
