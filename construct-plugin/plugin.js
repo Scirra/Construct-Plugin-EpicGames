@@ -12,7 +12,6 @@ const SDK = self.SDK;
 const PLUGIN_ID = "EpicGames_Ext";
 ////////////////////////////////////////////
 
-const PLUGIN_VERSION = "1.0.1.0";
 const PLUGIN_CATEGORY = "platform-specific";
 
 const PLUGIN_CLASS = SDK.Plugins.EpicGames_Ext = class EpicGames_Ext extends SDK.IPluginBase
@@ -25,7 +24,6 @@ const PLUGIN_CLASS = SDK.Plugins.EpicGames_Ext = class EpicGames_Ext extends SDK
 		
 		this._info.SetName(self.lang(".name"));
 		this._info.SetDescription(self.lang(".description"));
-		this._info.SetVersion(PLUGIN_VERSION);
 		this._info.SetCategory(PLUGIN_CATEGORY);
 		this._info.SetAuthor("Scirra");
 		this._info.SetHelpUrl(self.lang(".help-url"));

@@ -1,14 +1,12 @@
 
-const C3 = self.C3;
+const C3 = globalThis.C3;
 
-C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKInstanceBase
+C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends globalThis.ISDKInstanceBase
 {
-	constructor(inst, properties)
+	constructor()
 	{
-		super(inst);
-		
 		// Set "scirra-epic-games" component ID, matching the same component ID set by the wrapper extension.
-		this.SetWrapperExtensionComponentId("scirra-epic-games");
+		super({ wrapperComponentId: "scirra-epic-games" });
 		
 		this._isAvailable = false;
 
@@ -48,6 +46,7 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKIn
 		// For triggers
 		this._triggerAchievement = "";
 		
+		const properties = this._getInitProperties();
 		if (properties)
 		{
 			this._productName = properties[0];
@@ -66,33 +65,33 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKIn
 		}
 
 		// Listen for login status change events from the extension.
-		this.AddWrapperExtensionMessageHandler("on-login-status-changed", e => this._OnLoginStatusChanged(e));
+		this._addWrapperExtensionMessageHandler("on-login-status-changed", e => this._onLoginStatusChanged(e));
 
 		// Corresponding wrapper extension is available
-		if (this.IsWrapperExtensionAvailable())
+		if (this._IsWrapperExtensionAvailable())
 		{
 			// Run async init during loading
-			this._runtime.AddLoadPromise(this._Init());
+			this.runtime.addLoadPromise(this._init());
 
 			// Epic Games needs the app to regularly call EOS_Platform_Tick(), which is done by sending
 			// the "platform-tick" message every tick. However Construct's Tick() callback only starts
 			// once the loading screen finishes. In order to allow Epic Games to continue ticking while
 			// the loading screen is showing, set a timer to tick every 20ms until the first tick,
 			// which then clears the timer.
-			this._loadingTimerId = self.setInterval(() => this._PlatformTick(), 20);
+			this._loadingTimerId = globalThis.setInterval(() => this._platformTick(), 20);
 
-			this._StartTicking();
+			this.setTicking(true);
 		}
 	}
 	
-	async _Init()
+	async _init()
 	{
 		// Send init message to wrapper extension and wait for result.
-		const result = await this.SendWrapperExtensionMessageAsync("init", [
+		const result = await this._sendWrapperExtensionMessageAsync("init", [
 			// First 2 parameters are product name and product version.
 			// If either is left empty, the project name/version are used instead.
-			this._productName || this._runtime.GetProjectName(),
-			this._productVersion || this._runtime.GetProjectVersion(),
+			this._productName || this.runtime.projectName,
+			this._productVersion || this.runtime.projectVersion,
 
 			// Next 5 parameters are SDK settings
 			this._productId,
@@ -112,89 +111,89 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKIn
 		}
 	}
 	
-	Release()
+	_release()
 	{
-		super.Release();
+		super._release();
 	}
 
-	Tick()
+	_tick()
 	{
 		// On the first tick, clear the timer running for the loading screen.
 		if (this._loadingTimerId !== -1)
 		{
-			self.clearInterval(this._loadingTimerId);
+			globalThis.clearInterval(this._loadingTimerId);
 			this._loadingTimerId = -1;
 		}
 		
-		this._PlatformTick();
+		this._platformTick();
 	}
 
-	_PlatformTick()
+	_platformTick()
 	{
 		// Tell extension to call EOS_Platform_Tick().
-		this.SendWrapperExtensionMessage("platform-tick");
+		this._sendWrapperExtensionMessage("platform-tick");
 	}
 
-	_IsAvailable()
+	get isAvailable()
 	{
 		return this._isAvailable;
 	}
 
-	_IsEpicLauncher()
+	get isEpicLauncher()
 	{
 		return this._isEpicLauncher;
 	}
 
-	_GetLauncherExchangeCode()
+	get launcherExchangeCode()
 	{
 		return this._launcherExchangeCode;
 	}
 
-	async _LogInPortal()
+	async logInPortal()
 	{
-		if (!this._IsAvailable())
+		if (!this._isAvailable)
 			return;
 
 		// Set portal login type for 'Compare login type' condition
 		this._loginType = 0;
 
-		const result = await this.SendWrapperExtensionMessageAsync("log-in-portal", [
+		const result = await this._sendWrapperExtensionMessageAsync("log-in-portal", [
 			this._scopeBasicProfile,
 			this._scopeFriendsList,
 			this._scopePresence,
 			this._scopeCountry
 		]);
 
-		this._HandleLogInResult(result);
+		this._handleLogInResult(result);
 	}
 
-	async _LogInPersistent()
+	async logInPersistent()
 	{
-		if (!this._IsAvailable())
+		if (!this._isAvailable)
 			return;
 
 		// Set persistent login type for 'Compare login type' condition
 		this._loginType = 1;
 
-		const result = await this.SendWrapperExtensionMessageAsync("log-in-persistent", [
+		const result = await this._sendWrapperExtensionMessageAsync("log-in-persistent", [
 			this._scopeBasicProfile,
 			this._scopeFriendsList,
 			this._scopePresence,
 			this._scopeCountry
 		]);
 
-		this._HandleLogInResult(result);
+		this._handleLogInResult(result);
 	}
 
-	async _LogInExchangeCode(exchangeCode)
+	async logInExchangeCode(exchangeCode)
 	{
-		if (!this._IsAvailable())
+		if (!this._isAvailable)
 			return;
 
 		// Set exchange code login type for 'Compare login type' condition
 		this._loginType = 2;
 
-		const result = await this.SendWrapperExtensionMessageAsync("log-in-exchange-code", [
+		const result = await this._sendWrapperExtensionMessageAsync("log-in-exchange-code", [
 			this._scopeBasicProfile,
 			this._scopeFriendsList,
 			this._scopePresence,
@@ -202,18 +201,18 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKIn
 			exchangeCode
 		]);
 
-		this._HandleLogInResult(result);
+		this._handleLogInResult(result);
 	}
 
-	async _LogInDevAuthTool(host, credentialName)
+	async logInDevAuthTool(host, credentialName)
 	{
-		if (!this._IsAvailable())
+		if (!this._isAvailable)
 			return;
 
 		// Set DevAuthTool login type for 'Compare login type' condition
 		this._loginType = 3;
 
-		const result = await this.SendWrapperExtensionMessageAsync("log-in-devauthtool", [
+		const result = await this._sendWrapperExtensionMessageAsync("log-in-devauthtool", [
 			this._scopeBasicProfile,
 			this._scopeFriendsList,
 			this._scopePresence,
@@ -222,10 +221,10 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKIn
 			credentialName
 		]);
 
-		this._HandleLogInResult(result);
+		this._handleLogInResult(result);
 	}
 
-	_HandleLogInResult(result)
+	_handleLogInResult(result)
 	{
 		if (result["isOk"])
 		{
@@ -237,20 +236,20 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKIn
 			this._preferredLanguage = result["preferredLanguage"];
 			this._userCountry = result["country"];
 			
-			this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLoginComplete);
+			this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLoginComplete);
 		}
 		else
 		{
-			this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLoginFailed);
+			this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLoginFailed);
 		}
 	}
 
-	async _LogOut()
+	async logOut()
 	{
-		if (!this._IsAvailable())
+		if (!this._isAvailable)
 			return;
 
-		const result = await this.SendWrapperExtensionMessageAsync("log-out");
+		const result = await this._sendWrapperExtensionMessageAsync("log-out");
 
 		if (result["isOk"])
 		{
@@ -263,15 +262,15 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKIn
 			this._preferredLanguage = "";
 			this._userCountry = "";
 			
-			this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLogoutComplete);
+			this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLogoutComplete);
 		}
 		else
 		{
-			this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLogoutFailed);
+			this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLogoutFailed);
 		}
 	}
 
-	_OnLoginStatusChanged(e)
+	_onLoginStatusChanged(e)
 	{
 		const loginStatus = e["loginStatus"];
 
@@ -293,102 +292,78 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends C3.SDKIn
 			break;
 		}
 
-		this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLoginStatusChanged);
+		this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnLoginStatusChanged);
 	}
 
-	_GetLoginStatus()
+	get loginStatus()
 	{
 		return this._loginStatus;
 	}
 
-	_GetEpicAccountIdString()
+	get epicAccountIdString()
 	{
 		return this._epicAccountIdStr;
 	}
 
-	_GetDisplayName()
+	get displayName()
 	{
 		return this._displayName;
 	}
 
-	_GetDisplayNameSanitized()
+	get displayNameSanitized()
 	{
 		return this._displayNameSanitized;
 	}
 
-	_GetNickname()
+	get nickname()
 	{
 		return this._nickname;
 	}
 
-	_GetPreferredLanguage()
+	get preferredLanguage()
 	{
 		return this._preferredLanguage;
 	}
 
-	_GetUserCountry()
+	get userCountry()
 	{
 		return this._userCountry;
 	}
 
-	async _UnlockAchievement(achievement)
+	async unlockAchievement(achievement)
 	{
-		if (!this._IsAvailable())
+		if (!this._isAvailable)
 			return false;
 		
-		const result = await this.SendWrapperExtensionMessageAsync("unlock-achievement", [achievement]);
+		const result = await this._sendWrapperExtensionMessageAsync("unlock-achievement", [achievement]);
 
 		this._triggerAchievement = achievement;
 
 		const isOk = result["isOk"];
 		if (isOk)
 		{
-			this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnAnyAchievementUnlockSuccess);
-			this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnAchievementUnlockSuccess);
+			this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnAnyAchievementUnlockSuccess);
+			this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnAchievementUnlockSuccess);
 		}
 		else
 		{
-			this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnAnyAchievementUnlockError);
-			this.Trigger(C3.Plugins.EpicGames_Ext.Cnds.OnAchievementUnlockError);
+			this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnAnyAchievementUnlockError);
+			this._trigger(C3.Plugins.EpicGames_Ext.Cnds.OnAchievementUnlockError);
 		}
 
 		// Return result for script interface
 		return isOk;
 	}
 	
-	SaveToJson()
+	_saveToJson()
 	{
 		return {
 			// data to be saved for savegames
 		};
 	}
 	
-	LoadFromJson(o)
+	_loadFromJson(o)
 	{
 		// load state for savegames
-	}
-
-	GetScriptInterfaceClass()
-	{
-		return self.IEpicGamesExtGlobalInstance;
-	}
-};
-
-// Script interface. Use a WeakMap to safely hide the internal implementation details from the
-// caller using the script interface.
-const map = new WeakMap();
-
-self.IEpicGamesExtGlobalInstance = class IEpicGamesExtGlobalInstance extends self.IInstance {
-	constructor()
-	{
-		super();
-		
-		// Map by SDK instance
-		map.set(this, self.IInstance._GetInitInst().GetSdkInstance());
-	}
-
-	get isAvailable()
-	{
-		return map.get(this)._IsAvailable();
 	}
 };

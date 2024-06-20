@@ -1,35 +1,35 @@
 
-const C3 = self.C3;
+const C3 = globalThis.C3;
 
 C3.Plugins.EpicGames_Ext.Acts =
 {
 	async LogInPortal()
     {
-        await this._LogInPortal();
+        await this.logInPortal();
     },
 
     async LogInPersistent()
     {
-        await this._LogInPersistent();
+        await this.logInPersistent();
     },
 
     async LogInExchangeCode(exchangeCode)
     {
-        await this._LogInExchangeCode(exchangeCode);
+        await this.logInExchangeCode(exchangeCode);
     },
 
     async LogInDevAuthTool(host, credentialName)
     {
-        await this._LogInDevAuthTool(host, credentialName);
+        await this.logInDevAuthTool(host, credentialName);
     },
 
     async LogOut()
     {
-        await this._LogOut();
+        await this.logOut();
     },
 
     async UnlockAchievement(achievementId)
     {
-        await this._UnlockAchievement(achievementId);
+        await this.unlockAchievement(achievementId);
     }
 };

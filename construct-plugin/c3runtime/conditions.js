@@ -1,16 +1,16 @@
 
-const C3 = self.C3;
+const C3 = globalThis.C3;
 
 C3.Plugins.EpicGames_Ext.Cnds =
 {
 	IsAvailable()
 	{
-		return this._IsAvailable();
+		return this.isAvailable;
 	},
 
 	IsEpicLauncher()
 	{
-		return this._IsEpicLauncher();
+		return this.isEpicLauncher;
 	},
 
 	OnLoginComplete()
