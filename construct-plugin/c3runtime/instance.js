@@ -68,7 +68,7 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends globalTh
 		this._addWrapperExtensionMessageHandler("on-login-status-changed", e => this._onLoginStatusChanged(e));
 
 		// Corresponding wrapper extension is available
-		if (this._IsWrapperExtensionAvailable())
+		if (this._isWrapperExtensionAvailable())
 		{
 			// Run async init during loading
 			this.runtime.addLoadPromise(this._init());
@@ -80,7 +80,7 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends globalTh
 			// which then clears the timer.
 			this._loadingTimerId = globalThis.setInterval(() => this._platformTick(), 20);
 
-			this.setTicking(true);
+			this._setTicking(true);
 		}
 	}
 	
