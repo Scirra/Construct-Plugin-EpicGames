@@ -102,7 +102,7 @@ class EpicGames_ExtInstance extends globalThis.ISDKInstanceBase
 		if (this._isWrapperExtensionAvailable())
 		{
 			// Run async init during loading
-			this.runtime.addLoadPromise(this._init());
+			this.runtime.sdk.addLoadPromise(this._init());
 
 			// Epic Games needs the app to regularly call EOS_Platform_Tick(), which is done by sending
 			// the "platform-tick" message every tick. However Construct's Tick() callback only starts
