@@ -4,6 +4,8 @@
 /wrapper-extension/epic-games-sdk/
 /wrapper-extension/x64/
 /wrapper-extension/Win32/
+/wrapper-extension/EpicGamesExt/x64/
+/wrapper-extension/EpicGamesExt/Win32/
 /construct-plugin/*.exp
 /construct-plugin/*.lib
 /construct-plugin/*.pdb
