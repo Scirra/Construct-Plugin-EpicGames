@@ -111,3 +111,31 @@ std::vector<NamedExtensionParameterPOD> PackNamedExtensionParameters(const std::
 
 	return ret;
 }
+
+void DebugLog(const std::string& message)
+{
+	std::wstring messageW = Utf8ToWide(message);
+	OutputDebugString(messageW.c_str());
+}
+
+// Trim whitespace from a string
+void TrimStringLeft(std::string& str)
+{
+	auto i = std::find_if(str.begin(), str.end(), [](char ch) {
+		return !std::isspace(ch);
+		});
+
+	str.erase(str.begin(), i);
+}
+
+void TrimStringRight(std::string& str)
+{
+	while (!str.empty() && std::isspace(str.back()))
+		str.pop_back();
+}
+
+void TrimString(std::string& str)
+{
+	TrimStringRight(str);
+	TrimStringLeft(str);
+}

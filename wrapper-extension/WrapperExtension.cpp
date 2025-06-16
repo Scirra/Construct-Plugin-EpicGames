@@ -2,6 +2,10 @@
 #include "pch.h"
 #include "WrapperExtension.h"
 
+#include "json.hpp"
+
+const char* COMPONENT_ID = "scirra-epic-games";
+
 //////////////////////////////////////////////////////
 // Boilerplate stuff
 WrapperExtension* g_Extension = nullptr;
@@ -41,19 +45,20 @@ WrapperExtension::WrapperExtension(IApplication* iApplication_)
 	: iApplication(iApplication_),
 	  hWndMain(NULL),
 	  didEpicGamesInitOk(false),
+	  isEpicLauncher(false),
 	  sharedHandles{},
 	  hAuth(nullptr),
 	  hConnect(nullptr),
 	  hUserInfo(nullptr),
 	  hAchievements(nullptr)
 {
-	OutputDebugString(L"[EpicExt] Loaded extension\n");
+	LogMessage("Loaded extension");
 
 	// Tell the host application the SDK version used. Don't change this.
 	iApplication->SetSdkVersion(WRAPPER_EXT_SDK_VERSION);
 
 	// Register the "scirra-epic-games" component for JavaScript messaging
-	iApplication->RegisterComponentId("scirra-epic-games");
+	iApplication->RegisterComponentId(COMPONENT_ID);
 
 	// Set a shared pointer to the EOS_Shared_Handles struct, so companion plugins
 	// can access the handles created by this extension.
@@ -63,11 +68,176 @@ WrapperExtension::WrapperExtension(IApplication* iApplication_)
 void WrapperExtension::Init()
 {
 	// Called during startup after all other extensions have been loaded.
+	// Parse the content of package.json and read the exported properties like the product ID and client ID.
+	// These are exported with the SetWrapperExportProperties() method and end up in package.json like this:
+	//{
+	//	...
+	//	"exported-properties": {
+	//		"scirra-epic-games": {
+	//			"product-id": "...",
+	//			"client-id": "...",
+	//			...
+	//		}
+	//	}
+	//}
+
+	std::string productName;
+	std::string productVersion;
+
+	try {
+		auto packageJson = nlohmann::json::parse(iApplication->GetPackageJsonContent());
+
+		// Get the project name and version from the "project-details" section of package.json, as these
+		// are used as fallbacks for the product name and version if those aren't specified.
+		const auto& projectDetails = packageJson["project-details"];
+		std::string projectName =		projectDetails["name"].get<std::string>();
+		std::string projectVersion =	projectDetails["version"].get<std::string>();
+		TrimString(projectName);
+		TrimString(projectVersion);
+
+		// Read the exported properties from the Epic Games plugin.
+		const auto& epicProps = packageJson["exported-properties"][COMPONENT_ID];
+		productName =		epicProps["product-name"].get<std::string>();
+		productVersion =	epicProps["product-version"].get<std::string>();
+		productId =			epicProps["product-id"].get<std::string>();
+		clientId =			epicProps["client-id"].get<std::string>();
+		clientSecret =		epicProps["client-secret"].get<std::string>();
+		sandboxId =			epicProps["sandbox-id"].get<std::string>();
+		deploymentId =		epicProps["deployment-id"].get<std::string>();
+
+		// Trim whitespace from all the above strings.
+		TrimString(productName);
+		TrimString(productVersion);
+		TrimString(productId);
+		TrimString(clientId);
+		TrimString(clientSecret);
+		TrimString(sandboxId);
+		TrimString(deploymentId);
+
+		// If the product name or version are omitted, use the project name or version.
+		if (productName.empty())
+			productName = projectName;
+		if (productVersion.empty())
+			productVersion = projectVersion;
+
+		std::stringstream ss;
+		ss << "Parsed package JSON (product name '" << productName << "', product version '" << productVersion << "', product id '" << productId << "', client id '"
+			<< clientId << "', client secret '" << clientSecret << "', sandbox id '" << sandboxId << "', deployment id '" << deploymentId << "'";
+		LogMessage(ss.str());
+	}
+	catch (...)
+	{
+		LogMessage("Failed to read properties package JSON");
+		return;
+	}
+
+	InitEpicGamesSDK(productName, productVersion);
+}
+
+void WrapperExtension::InitEpicGamesSDK(const std::string& productName, const std::string& productVersion)
+{
+	// Dump the full command line to the debug log for diagnostic purposes,
+	// as command line parsing is used to activate some features
+	std::wstring commandLine = GetCommandLine();
+	LogMessage(std::string("Command line: ") + WideToUtf8(GetCommandLine()));
+
+	// Detect the Epic launcher and the provided exchange code from the command line.
+	// Use CommandLineToArgvW() to parse the command line for us
+	int argc = 0;
+	LPWSTR* argv = CommandLineToArgvW(commandLine.c_str(), &argc);
+	if (argv != nullptr)
+	{
+		// For each command line option
+		for (int i = 0; i < argc; ++i)
+		{
+			std::wstring arg = argv[i];
+
+			// Check for the -EpicPortal argument indicating started from the Epic Games launcher
+			if (arg == L"-EpicPortal")
+			{
+				isEpicLauncher = true;
+			}
+			// Check for an argument prefixed -AUTH_PASSWORD= and use the provided value as the
+			// launcher exchange code. This can be used for an automatic login.
+			else if (arg.substr(0, 15) == L"-AUTH_PASSWORD=")
+			{
+				launcherExchangeCode = WideToUtf8(arg.substr(15));
+			}
+		}
+	}
+
+	EOS_InitializeOptions initOpts = {};
+	initOpts.ApiVersion = EOS_INITIALIZE_API_LATEST;
+	initOpts.ProductName = productName.c_str();
+	initOpts.ProductVersion = productVersion.c_str();
+
+	EOS_EResult initResult = EOS_Initialize(&initOpts);
+	didEpicGamesInitOk = (initResult == EOS_EResult::EOS_Success);
+
+	if (didEpicGamesInitOk)
+	{
+		LogMessage("Successfully initialized Epic Games SDK");
+
+		// Initialize logging
+		EOS_Logging_SetCallback([](const EOS_LogMessage* Message) {
+			g_Extension->OnEOSLogMessage(Message);
+		});
+
+#ifdef _DEBUG
+		EOS_Logging_SetLogLevel(EOS_ELogCategory::EOS_LC_ALL_CATEGORIES, EOS_ELogLevel::EOS_LOG_Verbose);
+#else
+		EOS_Logging_SetLogLevel(EOS_ELogCategory::EOS_LC_ALL_CATEGORIES, EOS_ELogLevel::EOS_LOG_Warning);
+#endif
+
+		// Initialize platform
+		EOS_Platform_Options platOpts = {};
+		std::string appDataFolder = iApplication->GetCurrentAppDataFolder();
+		std::string cacheDir = appDataFolder + "\\EOSCache\\";
+
+		platOpts.ApiVersion = EOS_PLATFORM_OPTIONS_API_LATEST;
+		platOpts.ProductId = productId.c_str();
+		platOpts.SandboxId = sandboxId.c_str();
+		platOpts.ClientCredentials.ClientId = clientId.c_str();
+		platOpts.ClientCredentials.ClientSecret = clientSecret.c_str();
+		platOpts.DeploymentId = deploymentId.c_str();
+		platOpts.bIsServer = EOS_FALSE;
+		platOpts.CacheDirectory = cacheDir.c_str();
+
+		// Note encryption key is not used so it is just set to a dummy value
+		platOpts.EncryptionKey = "1111111111111111111111111111111111111111111111111111111111111111";
+
+		sharedHandles.hPlatform = EOS_Platform_Create(&platOpts);
+
+		// Get other interfaces
+		hAuth = EOS_Platform_GetAuthInterface(sharedHandles.hPlatform);
+		hConnect = EOS_Platform_GetConnectInterface(sharedHandles.hPlatform);
+		hUserInfo = EOS_Platform_GetUserInfoInterface(sharedHandles.hPlatform);
+		hAchievements = EOS_Platform_GetAchievementsInterface(sharedHandles.hPlatform);
+
+		// Add callbacks
+		EOS_Auth_AddNotifyLoginStatusChangedOptions nlscOpts = {};
+		nlscOpts.ApiVersion = EOS_AUTH_ADDNOTIFYLOGINSTATUSCHANGED_API_LATEST;
+		EOS_Auth_AddNotifyLoginStatusChanged(hAuth, &nlscOpts, nullptr, [](const EOS_Auth_LoginStatusChangedCallbackInfo* Data)
+		{
+			g_Extension->OnLogInStatusChanged(Data);
+		});
+
+		EOS_Connect_AddNotifyAuthExpirationOptions Options = {};
+		Options.ApiVersion = EOS_CONNECT_ADDNOTIFYAUTHEXPIRATION_API_LATEST;
+		EOS_Connect_AddNotifyAuthExpiration(hConnect, &Options, nullptr, [](const EOS_Connect_AuthExpirationCallbackInfo* Data)
+		{
+			g_Extension->OnConnectAuthExpiration(Data);
+		});
+	}
+	else
+	{
+		LogMessage("Failed to initialize Epic Games SDK");
+	}
 }
 
 void WrapperExtension::Release()
 {
-	OutputDebugString(L"[EpicExt] Releasing extension\n");
+	LogMessage("Releasing extension");
 
 	if (didEpicGamesInitOk)
 	{
@@ -80,9 +250,42 @@ void WrapperExtension::Release()
 		EOS_EResult shutdownResult = EOS_Shutdown();
 		if (shutdownResult != EOS_EResult::EOS_Success)
 		{
-			OutputDebugString(L"[EpicExt] Warning: EOS_Shutdown() did not complete successfully\n");
+			LogMessage("Warning: EOS_Shutdown() did not complete successfully");
 		}
 	}
+}
+
+void WrapperExtension::LogMessage(const std::string& msg)
+{
+	// Log messages both to the browser console with the LogToConsole() method, and also to the debug output
+	// with the DebugLog() helper function, to ensure whichever log we're looking at includes the log messages.
+	std::stringstream ss;
+	ss << "[EpicExt] " << msg;
+	iApplication->LogToConsole(IApplication::LogLevel::normal, ss.str().c_str());
+
+	// Add trailing newline for debug output
+	ss << "\n";
+	DebugLog(ss.str().c_str());
+}
+
+void WrapperExtension::OnEOSLogMessage(const EOS_LogMessage* Message)
+{
+	// As above but outputting EOS logs directly, tagged [EOSLog].
+	std::stringstream ss;
+	ss << "[EOS][" << Message->Category << "/" << std::to_string(static_cast<int>(Message->Level)) << "] " << Message->Message;
+
+	// Copy browser log level from the EOS log level.
+	IApplication::LogLevel logLevel = IApplication::LogLevel::normal;
+	if (Message->Level <= EOS_ELogLevel::EOS_LOG_Error)
+		logLevel = IApplication::LogLevel::error;
+	else if (Message->Level <= EOS_ELogLevel::EOS_LOG_Warning)
+		logLevel = IApplication::LogLevel::warning;
+
+	iApplication->LogToConsole(logLevel, ss.str().c_str());
+
+	// Also send to debug output with trailing newline
+	ss << "\n";
+	DebugLog(ss.str().c_str());
 }
 
 void WrapperExtension::OnMainWindowCreated(HWND hWnd)
@@ -96,18 +299,7 @@ void WrapperExtension::HandleWebMessage(const std::string& messageId, const std:
 {
 	if (messageId == "init")
 	{
-		// Get product name and version
-		const std::string& productName = params[0].GetString();
-		const std::string& productVersion = params[1].GetString();
-
-		// Save the SDK settings
-		productId = params[2].GetString();
-		clientId = params[3].GetString();
-		clientSecret = params[4].GetString();
-		sandboxId = params[5].GetString();
-		deploymentId = params[6].GetString();
-
-		OnInitMessage(productName, productVersion, asyncId);
+		OnInitMessage(asyncId);
 	}
 	else if (messageId == "platform-tick")
 	{
@@ -169,128 +361,12 @@ void WrapperExtension::HandleWebMessage(const std::string& messageId, const std:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Initialization
-
-void EOS_CALL OnEOSLogMessage(const EOS_LogMessage* Message)
+void WrapperExtension::OnInitMessage(double asyncId)
 {
-	OutputDebugString(L"[EOS][");
-	OutputDebugString(Utf8ToWide(Message->Category).c_str());
-	OutputDebugString(L"/");
-	OutputDebugString(std::to_wstring(static_cast<int>(Message->Level)).c_str());
-	OutputDebugString(L"] ");
-	OutputDebugString(Utf8ToWide(Message->Message).c_str());
-	OutputDebugString(L"\n");
-}
-
-// Callback for EOS_Auth_AddNotifyLoginStatusChanged() that forwards to WrapperExtension::OnLogInStatusChanged()
-void EOS_CALL LoginStatusChangedCallbackFn(const EOS_Auth_LoginStatusChangedCallbackInfo* Data)
-{
-	WrapperExtension* extension = static_cast<WrapperExtension*>(Data->ClientData);
-	extension->OnLogInStatusChanged(Data);
-}
-
-// Callback for EOS_Connect_AddNotifyAuthExpiration() that forwards to WrapperExtension::OnConnectAuthExpiration()
-void EOS_CALL ConnectAuthExpirationCallbackFn(const EOS_Connect_AuthExpirationCallbackInfo* Data)
-{
-	WrapperExtension* extension = static_cast<WrapperExtension*>(Data->ClientData);
-	extension->OnConnectAuthExpiration(Data);
-}
-
-void WrapperExtension::OnInitMessage(const std::string& productName, const std::string& productVersion, double asyncId)
-{
-	// Dump the full command line to the debug log for diagnostic purposes,
-	// as command line parsing is used to activate some features
-	std::wstring commandLine = GetCommandLine();
-	OutputDebugString(L"[EpicExt] Command line:\n");
-	OutputDebugString(commandLine.c_str());
-	OutputDebugString(L"\n");
-
-	// Detect the Epic launcher and the provided exchange code from the command line
-	bool isEpicLauncher = false;
-	std::string launcherExchangeCode;
-
-	// Use CommandLineToArgvW() to parse the command line for us
-	int argc = 0;
-	LPWSTR* argv = CommandLineToArgvW(commandLine.c_str(), &argc);
-	if (argv != nullptr)
-	{
-		// For each command line option
-		for (int i = 0; i < argc; ++i)
-		{
-			std::wstring arg = argv[i];
-
-			// Check for the -EpicPortal argument indicating started from the Epic Games launcher
-			if (arg == L"-EpicPortal")
-			{
-				isEpicLauncher = true;
-			}
-			// Check for an argument prefixed -AUTH_PASSWORD= and use the provided value as the
-			// launcher exchange code. This can be used for an automatic login.
-			else if (arg.substr(0, 15) == L"-AUTH_PASSWORD=")
-			{
-				launcherExchangeCode = WideToUtf8(arg.substr(15));
-			}
-		}
-	}
-
-	EOS_InitializeOptions initOpts = {};
-	initOpts.ApiVersion = EOS_INITIALIZE_API_LATEST;
-	initOpts.ProductName = productName.c_str();
-	initOpts.ProductVersion = productVersion.c_str();
-
-	EOS_EResult initResult = EOS_Initialize(&initOpts);
-	didEpicGamesInitOk = (initResult == EOS_EResult::EOS_Success);
-
+	// Note the actual initialization is done in InitEpicGamesSDK(). This just sends the result
+	// of initialization back to the Construct plugin.
 	if (didEpicGamesInitOk)
 	{
-		OutputDebugString(L"[EpicExt] Successfully initialized Epic Games SDK\n");
-
-		// Initialize logging
-		EOS_Logging_SetCallback(OnEOSLogMessage);
-
-#ifdef _DEBUG
-		EOS_Logging_SetLogLevel(EOS_ELogCategory::EOS_LC_ALL_CATEGORIES, EOS_ELogLevel::EOS_LOG_Verbose);
-#else
-		EOS_Logging_SetLogLevel(EOS_ELogCategory::EOS_LC_ALL_CATEGORIES, EOS_ELogLevel::EOS_LOG_Warning);
-#endif
-
-		// Initialize platform
-		EOS_Platform_Options platOpts = {};
-		std::string appDataFolder = iApplication->GetCurrentAppDataFolder();
-		std::string cacheDir = appDataFolder + "\\EOSCache\\";
-
-		platOpts.ApiVersion = EOS_PLATFORM_OPTIONS_API_LATEST;
-		platOpts.ProductId = productId.c_str();
-		platOpts.SandboxId = sandboxId.c_str();
-		platOpts.ClientCredentials.ClientId = clientId.c_str();
-		platOpts.ClientCredentials.ClientSecret = clientSecret.c_str();
-		platOpts.DeploymentId = deploymentId.c_str();
-		platOpts.bIsServer = EOS_FALSE;
-		platOpts.CacheDirectory = cacheDir.c_str();
-
-		// HACK: for now disable the EOS overlay, as it doesn't seem to work with
-		// WebView2 or even the D3D11Overlay workaround.
-		platOpts.Flags = EOS_PF_DISABLE_OVERLAY;
-
-		// Note encryption key is not used so it is just set to a dummy value
-		platOpts.EncryptionKey = "1111111111111111111111111111111111111111111111111111111111111111";
-
-		sharedHandles.hPlatform = EOS_Platform_Create(&platOpts);
-
-		// Get other interfaces
-		hAuth = EOS_Platform_GetAuthInterface(sharedHandles.hPlatform);
-		hConnect = EOS_Platform_GetConnectInterface(sharedHandles.hPlatform);
-		hUserInfo = EOS_Platform_GetUserInfoInterface(sharedHandles.hPlatform);
-		hAchievements = EOS_Platform_GetAchievementsInterface(sharedHandles.hPlatform);
-
-		// Add callbacks
-		EOS_Auth_AddNotifyLoginStatusChangedOptions nlscOpts = {};
-		nlscOpts.ApiVersion = EOS_AUTH_ADDNOTIFYLOGINSTATUSCHANGED_API_LATEST;
-		EOS_Auth_AddNotifyLoginStatusChanged(hAuth, &nlscOpts, this, LoginStatusChangedCallbackFn);
-
-		EOS_Connect_AddNotifyAuthExpirationOptions Options = {};
-		Options.ApiVersion = EOS_CONNECT_ADDNOTIFYAUTHEXPIRATION_API_LATEST;
-		EOS_Connect_AddNotifyAuthExpiration(hConnect, &Options, NULL, ConnectAuthExpirationCallbackFn);
-
 		// Send init data back to JavaScript with key details from the API.
 		SendAsyncResponse({
 			{ "isAvailable", true },
@@ -300,8 +376,6 @@ void WrapperExtension::OnInitMessage(const std::string& productName, const std::
 	}
 	else
 	{
-		OutputDebugString(L"[EpicExt] Failed to initialize Epic Games SDK\n");
-
 		SendAsyncResponse({
 			{ "isAvailable", false }
 		}, asyncId);
@@ -346,7 +420,7 @@ void EOS_CALL LoginPortalCompleteCallbackFn(const EOS_Auth_LoginCallbackInfo* Da
 
 void WrapperExtension::OnLogInPortalMessage(bool basicProfile, bool friendsList, bool presence, bool country, double asyncId)
 {
-	OutputDebugString(L"[EpicExt] Starting log in via portal\n");
+	LogMessage("Starting log in via portal");
 
 	EOS_Auth_Credentials Credentials = {};
 	Credentials.ApiVersion = EOS_AUTH_CREDENTIALS_API_LATEST;
@@ -368,13 +442,13 @@ void WrapperExtension::OnLogInPortalCallback(const EOS_Auth_LoginCallbackInfo* D
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] OnLogInCallback: success\n");
+		LogMessage("OnLogInCallback: success");
 
 		HandleSuccessfulLogIn(Data, asyncId);
 	}
 	else	// login failed
 	{
-		OutputDebugString(L"[EpicExt] OnLogInCallback: failed\n");
+		LogMessage("OnLogInCallback: failed");
 
 		SendAsyncResponse({
 			{ "isOk", false }
@@ -403,7 +477,7 @@ void WrapperExtension::HandleSuccessfulLogIn(const EOS_Auth_LoginCallbackInfo* D
 	EOS_UserInfo* userInfo = nullptr;
 	if (EOS_UserInfo_CopyUserInfo(hUserInfo, &copyOpts, &userInfo) == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] EOS_UserInfo_CopyUserInfo succeeded\n");
+		LogMessage("EOS_UserInfo_CopyUserInfo succeeded");
 
 		// Copy user info to std::strings. Use a utility method that returns an empty
 		// string if passed nullptr since unavailable fields are set to nullptr.
@@ -418,7 +492,7 @@ void WrapperExtension::HandleSuccessfulLogIn(const EOS_Auth_LoginCallbackInfo* D
 	}
 	else
 	{
-		OutputDebugString(L"[EpicExt] EOS_UserInfo_CopyUserInfo failed\n");
+		LogMessage("EOS_UserInfo_CopyUserInfo failed");
 	}
 
 	// Use the Connect service to automatically attempt to obtain a Product User ID (PUID) for the
@@ -451,22 +525,22 @@ void EOS_CALL LoginPersistentCompleteCallbackFn(const EOS_Auth_LoginCallbackInfo
 	delete callbackInfo;
 }
 
-// Callback for EOS_Auth_DeletePersistentAuth(). This just logs the success/failure result for debugging.
-void EOS_CALL DeletePersistentAuthCallbackFn(const EOS_Auth_DeletePersistentAuthCallbackInfo* Data)
+void WrapperExtension::OnDeletePersistentAuthCallback(const EOS_Auth_DeletePersistentAuthCallbackInfo* Data)
 {
+	// Just log the success/failure result for debugging.
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] DeletePersistentAuthCallbackFn: success\n");
+		LogMessage("DeletePersistentAuthCallbackFn: success");
 	}
 	else
 	{
-		OutputDebugString(L"[EpicExt] DeletePersistentAuthCallbackFn: failed\n");
+		LogMessage("DeletePersistentAuthCallbackFn: failed");
 	}
 }
 
 void WrapperExtension::OnLogInPersistentMessage(bool basicProfile, bool friendsList, bool presence, bool country, double asyncId)
 {
-	OutputDebugString(L"[EpicExt] Starting log in via persistent auth\n");
+	LogMessage("Starting log in via persistent auth");
 
 	EOS_Auth_Credentials Credentials = {};
 	Credentials.ApiVersion = EOS_AUTH_CREDENTIALS_API_LATEST;
@@ -488,19 +562,22 @@ void WrapperExtension::OnLogInPersistentCallback(const EOS_Auth_LoginCallbackInf
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] OnLogInPersistentCallback: success\n");
+		LogMessage("OnLogInPersistentCallback: success");
 
 		HandleSuccessfulLogIn(Data, asyncId);
 	}
 	else	// login failed
 	{
-		OutputDebugString(L"[EpicExt] OnLogInPersistentCallback: failed\n");
+		LogMessage("OnLogInPersistentCallback: failed");
 
 		// Persistent login failed, so delete the persistent auth so it does not use the same
 		// persisted auth again next time.
 		EOS_Auth_DeletePersistentAuthOptions delOpts = {};
 		delOpts.ApiVersion = EOS_AUTH_DELETEPERSISTENTAUTH_API_LATEST;
-		EOS_Auth_DeletePersistentAuth(hAuth, &delOpts, nullptr, DeletePersistentAuthCallbackFn);
+		EOS_Auth_DeletePersistentAuth(hAuth, &delOpts, nullptr, [](const EOS_Auth_DeletePersistentAuthCallbackInfo* Data)
+		{
+			g_Extension->OnDeletePersistentAuthCallback(Data);
+		});
 
 		SendAsyncResponse({
 			{ "isOk", false }
@@ -521,7 +598,7 @@ void EOS_CALL LoginExchangeCodeCompleteCallbackFn(const EOS_Auth_LoginCallbackIn
 
 void WrapperExtension::OnLogInExchangeCodeMessage(bool basicProfile, bool friendsList, bool presence, bool country, const std::string& exchangeCode, double asyncId)
 {
-	OutputDebugString(L"[EpicExt] Starting log in via exchange code\n");
+	LogMessage("Starting log in via exchange code");
 
 	EOS_Auth_Credentials Credentials = {};
 	Credentials.ApiVersion = EOS_AUTH_CREDENTIALS_API_LATEST;
@@ -544,13 +621,13 @@ void WrapperExtension::OnLogInExchangeCodeCallback(const EOS_Auth_LoginCallbackI
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] OnLogInExchangeCodeCallback: success\n");
+		LogMessage("OnLogInExchangeCodeCallback: success");
 
 		HandleSuccessfulLogIn(Data, asyncId);
 	}
 	else	// login failed
 	{
-		OutputDebugString(L"[EpicExt] OnLogInExchangeCodeCallback: failed\n");
+		LogMessage("OnLogInExchangeCodeCallback: failed");
 
 		SendAsyncResponse({
 			{ "isOk", false }
@@ -571,7 +648,7 @@ void EOS_CALL LoginDevAuthToolCompleteCallbackFn(const EOS_Auth_LoginCallbackInf
 
 void WrapperExtension::OnLogInDevAuthToolMessage(bool basicProfile, bool friendsList, bool presence, bool country, const std::string& host, const std::string& credentialName, double asyncId)
 {
-	OutputDebugString(L"[EpicExt] Starting log in via DevAuthTool\n");
+	LogMessage("Starting log in via DevAuthTool");
 
 	EOS_Auth_Credentials Credentials = {};
 	Credentials.ApiVersion = EOS_AUTH_CREDENTIALS_API_LATEST;
@@ -595,13 +672,13 @@ void WrapperExtension::OnLogInDevAuthToolCallback(const EOS_Auth_LoginCallbackIn
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] OnLogInDevAuthToolCallback: success\n");
+		LogMessage("OnLogInDevAuthToolCallback: success");
 
 		HandleSuccessfulLogIn(Data, asyncId);
 	}
 	else	// login failed
 	{
-		OutputDebugString(L"[EpicExt] OnLogInDevAuthToolCallback: failed\n");
+		LogMessage("OnLogInDevAuthToolCallback: failed");
 
 		SendAsyncResponse({
 			{ "isOk", false }
@@ -622,7 +699,7 @@ void EOS_CALL LogoutCompleteCallbackFn(const EOS_Auth_LogoutCallbackInfo* Data)
 
 void WrapperExtension::OnLogOutMessage(double asyncId)
 {
-	OutputDebugString(L"[EpicExt] Starting log out\n");
+	LogMessage("Starting log out");
 
 	EOS_Auth_LogoutOptions LogoutOptions = {};
 	LogoutOptions.ApiVersion = EOS_AUTH_LOGOUT_API_LATEST;
@@ -639,7 +716,7 @@ void WrapperExtension::OnLogOutCallback(const EOS_Auth_LogoutCallbackInfo* Data,
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] OnLogOutCallback: success\n");
+		LogMessage("OnLogOutCallback: success");
 
 		// Clear details set when logged in
 		sharedHandles.epicAccountId = nullptr;
@@ -654,7 +731,10 @@ void WrapperExtension::OnLogOutCallback(const EOS_Auth_LogoutCallbackInfo* Data,
 		// automatic login.
 		EOS_Auth_DeletePersistentAuthOptions delOpts = {};
 		delOpts.ApiVersion = EOS_AUTH_DELETEPERSISTENTAUTH_API_LATEST;
-		EOS_Auth_DeletePersistentAuth(hAuth, &delOpts, nullptr, DeletePersistentAuthCallbackFn);
+		EOS_Auth_DeletePersistentAuth(hAuth, &delOpts, nullptr, [](const EOS_Auth_DeletePersistentAuthCallbackInfo* Data)
+		{
+			g_Extension->OnDeletePersistentAuthCallback(Data);
+		});
 
 		SendAsyncResponse({
 			{ "isOk", true }
@@ -662,7 +742,7 @@ void WrapperExtension::OnLogOutCallback(const EOS_Auth_LogoutCallbackInfo* Data,
 	}
 	else
 	{
-		OutputDebugString(L"[EpicExt] OnLogOutCallback: failed\n");
+		LogMessage("OnLogOutCallback: failed");
 
 		SendAsyncResponse({
 			{ "isOk", false }
@@ -684,7 +764,7 @@ void EOS_CALL UnlockAchievementCompleteCallbackFn(const EOS_Achievements_OnUnloc
 }
 void WrapperExtension::OnUnlockAchievementMessage(const std::string& achievementId, double asyncId)
 {
-	OutputDebugString(L"[EpicExt] Unlocking achievement\n");
+	LogMessage("Unlocking achievement");
 
 	const char* achievementIdPtr = achievementId.c_str();
 
@@ -705,7 +785,7 @@ void WrapperExtension::OnUnlockAchievementCallback(const EOS_Achievements_OnUnlo
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] OnUnlockAchievementCallback: success\n");
+		LogMessage("OnUnlockAchievementCallback: success");
 
 		SendAsyncResponse({
 			{ "isOk", true }
@@ -713,7 +793,7 @@ void WrapperExtension::OnUnlockAchievementCallback(const EOS_Achievements_OnUnlo
 	}
 	else
 	{
-		OutputDebugString(L"[EpicExt] OnUnlockAchievementCallback: failed\n");
+		LogMessage("OnUnlockAchievementCallback: failed");
 
 		SendAsyncResponse({
 			{ "isOk", false }
@@ -732,7 +812,7 @@ void EOS_CALL ConnectLoginCompleteCallbackFn(const EOS_Connect_LoginCallbackInfo
 
 void WrapperExtension::ConnectLogin()
 {
-	OutputDebugString(L"[EpicExt] ConnectLogin()\n");
+	LogMessage("ConnectLogin()");
 
 	// Note the SDK samples use EOS_Auth_CopyUserAuthToken() with EOS_EExternalCredentialType::EOS_ECT_EPIC,
 	// but the documentation states EOS_Auth_CopyIdToken() with EOS_EExternalCredentialType::EOS_ECT_EPIC_ID_TOKEN
@@ -764,20 +844,20 @@ void WrapperExtension::OnConnectLoginCallback(const EOS_Connect_LoginCallbackInf
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		OutputDebugString(L"[EpicExt] OnConnectLoginCallback: success\n");
+		LogMessage("OnConnectLoginCallback: success");
 
 		// Save the product user ID for use with achievements
 		sharedHandles.productUserId = Data->LocalUserId;
 	}
 	else
 	{
-		OutputDebugString(L"[EpicExt] OnConnectLoginCallback: failed\n");
+		LogMessage("OnConnectLoginCallback: failed");
 	}
 }
 
 void WrapperExtension::OnConnectAuthExpiration(const EOS_Connect_AuthExpirationCallbackInfo* Data)
 {
-	OutputDebugString(L"[EpicExt] OnConnectAuthExpiration()\n");
+	LogMessage("OnConnectAuthExpiration()");
 
 	// If still logged in, start ConnectLogin() again to refresh the product user ID
 	if (sharedHandles.epicAccountId != nullptr)

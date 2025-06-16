@@ -13,6 +13,10 @@ class WrapperExtension : public IExtension {
 public:
 	WrapperExtension(IApplication* iApplication_);
 
+	void InitEpicGamesSDK(const std::string& productName, const std::string& productVersion);
+	void LogMessage(const std::string& msg);
+	void OnEOSLogMessage(const EOS_LogMessage* Message);
+
 	// IExtension overrides
 	void Init();
 	void Release();
@@ -26,7 +30,7 @@ public:
 	void SendAsyncResponse(const std::map<std::string, ExtensionParameter>& params, double asyncId);
 
 	// Handler methods for specific kinds of message, and associated callback methods
-	void OnInitMessage(const std::string& productName, const std::string& productVersion, double asyncId);
+	void OnInitMessage(double asyncId);
 	void OnLogInStatusChanged(const EOS_Auth_LoginStatusChangedCallbackInfo* Data);
 
 	void OnLogInPortalMessage(bool basicProfile, bool friendsList, bool presence, bool country, double asyncId);
@@ -35,6 +39,7 @@ public:
 
 	void OnLogInPersistentMessage(bool basicProfile, bool friendsList, bool presence, bool country, double asyncId);
 	void OnLogInPersistentCallback(const EOS_Auth_LoginCallbackInfo* Data, double asyncId);
+	void OnDeletePersistentAuthCallback(const EOS_Auth_DeletePersistentAuthCallbackInfo* Data);
 
 	void OnLogInExchangeCodeMessage(bool basicProfile, bool friendsList, bool presence, bool country, const std::string& exchangeCode, double asyncId);
 	void OnLogInExchangeCodeCallback(const EOS_Auth_LoginCallbackInfo* Data, double asyncId);
@@ -57,6 +62,8 @@ protected:
 	HWND hWndMain;
 
 	bool didEpicGamesInitOk;
+	bool isEpicLauncher;
+	std::string launcherExchangeCode;
 
 	// Shared handles that other extensions can access with the
 	// GetSharedPtr API, allowing use of companion plugins which can

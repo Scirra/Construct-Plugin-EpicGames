@@ -6,15 +6,6 @@ class EpicGames_ExtInstance extends globalThis.ISDKInstanceBase
 	_isAvailable: boolean;
 	_loadingTimerId: number;
 
-	_productName: string;
-	_productVersion: string;
-
-	_productId: string;
-	_clientId: string;
-	_clientSecret: string;
-	_sandboxId: string;
-	_deploymentId: string;
-
 	_scopeBasicProfile: boolean;
 	_scopeFriendsList: boolean;
 	_scopePresence: boolean;
@@ -45,15 +36,6 @@ class EpicGames_ExtInstance extends globalThis.ISDKInstanceBase
 		this._loadingTimerId = -1;
 
 		// Properties
-		this._productName = "";
-		this._productVersion = "";
-
-		this._productId = "";
-		this._clientId = "";
-		this._clientSecret = "";
-		this._sandboxId = "";
-		this._deploymentId = "";
-
 		// Auth scope flags
 		this._scopeBasicProfile = true;
 		this._scopeFriendsList = false;
@@ -80,14 +62,9 @@ class EpicGames_ExtInstance extends globalThis.ISDKInstanceBase
 		const properties = this._getInitProperties();
 		if (properties)
 		{
-			this._productName = properties[0] as string;
-			this._productVersion = properties[1] as string;
-
-			this._productId = properties[2] as string;
-			this._clientId = properties[3] as string;
-			this._clientSecret = properties[4] as string;
-			this._sandboxId = properties[5] as string;
-			this._deploymentId = properties[6] as string;
+			// Note many of the properties are not read here and are instead exported to the package.json file
+			// with the call to SetWrapperExportProperties(). The wrapper extension then reads these values for
+			// initializing the Epic Games SDK.
 
 			this._scopeBasicProfile = properties[7] as boolean;
 			this._scopeFriendsList = properties[8] as boolean;
@@ -118,19 +95,7 @@ class EpicGames_ExtInstance extends globalThis.ISDKInstanceBase
 	async _init()
 	{
 		// Send init message to wrapper extension and wait for result.
-		const result = await this._sendWrapperExtensionMessageAsync("init", [
-			// First 2 parameters are product name and product version.
-			// If either is left empty, the project name/version are used instead.
-			this._productName || this.runtime.projectName,
-			this._productVersion || this.runtime.projectVersion,
-
-			// Next 5 parameters are SDK settings
-			this._productId,
-			this._clientId,
-			this._clientSecret,
-			this._sandboxId,
-			this._deploymentId
-		]) as JSONObject;
+		const result = await this._sendWrapperExtensionMessageAsync("init") as JSONObject;
 		
 		// Check availability of Epic Games features.
 		this._isAvailable = result["isAvailable"] as boolean;

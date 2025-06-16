@@ -9,6 +9,7 @@
 #include <vector>		// std::vector
 #include <map>			// std::map
 #include <string>		// std::string, std::wstring
+#include <sstream>		// std::stringstream
 
 // Include Epic Games SDK.
 // Add a compile check for the header as it's not shipped with this codebase.

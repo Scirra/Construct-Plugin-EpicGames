@@ -14,15 +14,6 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends globalTh
 		this._loadingTimerId = -1;
 
 		// Properties
-		this._productName = "";
-		this._productVersion = "";
-
-		this._productId = "";
-		this._clientId = "";
-		this._clientSecret = "";
-		this._sandboxId = "";
-		this._deploymentId = "";
-
 		// Auth scope flags
 		this._scopeBasicProfile = true;
 		this._scopeFriendsList = false;
@@ -49,14 +40,9 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends globalTh
 		const properties = this._getInitProperties();
 		if (properties)
 		{
-			this._productName = properties[0];
-			this._productVersion = properties[1];
-
-			this._productId = properties[2];
-			this._clientId = properties[3];
-			this._clientSecret = properties[4];
-			this._sandboxId = properties[5];
-			this._deploymentId = properties[6];
+			// Note many of the properties are not read here and are instead exported to the package.json file
+			// with the call to SetWrapperExportProperties(). The wrapper extension then reads these values for
+			// initializing the Epic Games SDK.
 
 			this._scopeBasicProfile = properties[7];
 			this._scopeFriendsList = properties[8];
@@ -87,19 +73,7 @@ C3.Plugins.EpicGames_Ext.Instance = class EpicGames_ExtInstance extends globalTh
 	async _init()
 	{
 		// Send init message to wrapper extension and wait for result.
-		const result = await this._sendWrapperExtensionMessageAsync("init", [
-			// First 2 parameters are product name and product version.
-			// If either is left empty, the project name/version are used instead.
-			this._productName || this.runtime.projectName,
-			this._productVersion || this.runtime.projectVersion,
-
-			// Next 5 parameters are SDK settings
-			this._productId,
-			this._clientId,
-			this._clientSecret,
-			this._sandboxId,
-			this._deploymentId
-		]);
+		const result = await this._sendWrapperExtensionMessageAsync("init");
 		
 		// Check availability of Epic Games features.
 		this._isAvailable = result["isAvailable"];

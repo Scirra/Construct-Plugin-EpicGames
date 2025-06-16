@@ -49,6 +49,9 @@ const PLUGIN_CLASS = SDK.Plugins.EpicGames_Ext = class EpicGames_Ext extends SDK
 			new SDK.PluginProperty("check", "scope-presence"),
 			new SDK.PluginProperty("check", "scope-country"),
 		]);
+
+		this._info.SetWrapperExportProperties("scirra-epic-games", ["product-name", "product-version",
+			"product-id", "client-id", "client-secret", "sandbox-id", "deployment-id"]);
 		
 		SDK.Lang.PopContext();		// .properties
 		
