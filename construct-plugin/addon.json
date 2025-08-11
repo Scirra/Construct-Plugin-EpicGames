@@ -32,9 +32,7 @@
 		"instance.js",
 		"plugin.js",
 		"type.js",
-		"EOSSDK-Win32-Shipping.dll",
 		"EOSSDK-Win64-Shipping.dll",
-		"EpicGames_x86.ext.dll",
 		"EpicGames_x64.ext.dll"
 	]
 }

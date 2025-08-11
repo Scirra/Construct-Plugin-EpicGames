@@ -59,18 +59,6 @@ const PLUGIN_CLASS = SDK.Plugins.EpicGames_Ext = class EpicGames_Ext extends SDK
 		
 		// Add necessary DLLs as wrapper extension dependencies.
 		this._info.AddFileDependency({
-			filename: "EpicGames_x86.ext.dll",
-			type: "wrapper-extension",
-			platform: "windows-x86"
-		});
-		
-		this._info.AddFileDependency({
-			filename: "EOSSDK-Win32-Shipping.dll",
-			type: "wrapper-extension",
-			platform: "windows-x86"
-		});
-		
-		this._info.AddFileDependency({
 			filename: "EpicGames_x64.ext.dll",
 			type: "wrapper-extension",
 			platform: "windows-x64"

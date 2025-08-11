@@ -15,10 +15,10 @@ To build the wrapper extension, you will need:
 - The [EOS SDK](https://dev.epicgames.com/sdk) - download the *C SDK* and extract the *SDK* subfolder to the *epic-games-sdk* subfolder such that the file `epic-games-sdk\Include\eos_sdk.h` exists.
 - An account on the [Epic Games Developer Portal](https://dev.epicgames.com/portal). You will need to create an organization and product and obtain the necessary IDs (*Product ID*, *Client ID*, *Client secret*, *Sandbox ID* and *Deployment ID* - see the [Epic developer documentation](https://dev.epicgames.com/docs) for more details).
 
-The Construct plugin requires 2 DLLs, each in the x86 (32-bit) and x64 (64-bit) architectures, for a total of 4 DLL files. These are:
+The Construct plugin requires 2 DLLs in the x64 (64-bit) architecture. These are:
 
-- **EpicGames_x86.ext.dll** / **EpicGames_x64.ext.dll** - the wrapper extension DLL, built from the *wrapper-extension* files
-- **EOSSDK-Win32-Shipping.dll** / **EOSSDK-Win64-Shipping.dll** - the EOS SDK DLLs
+- **EpicGames_x64.ext.dll** - the wrapper extension DLL, built from the *wrapper-extension* files
+- **EOSSDK-Win64-Shipping.dll** - the EOS SDK DLL
 
 For convenience these DLLs are provided in this repository. However if you make changes you may want to replace some of these DLLs.
 
