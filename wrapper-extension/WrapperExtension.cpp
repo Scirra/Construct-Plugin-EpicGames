@@ -442,13 +442,13 @@ void WrapperExtension::OnLogInPortalCallback(const EOS_Auth_LoginCallbackInfo* D
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
 	{
-		LogMessage("OnLogInCallback: success");
+		LogMessage("OnLogInPortalCallback: success");
 
 		HandleSuccessfulLogIn(Data, asyncId);
 	}
 	else	// login failed
 	{
-		LogMessage("OnLogInCallback: failed");
+		LogMessage("OnLogInPortalCallback: failed");
 
 		SendAsyncResponse({
 			{ "isOk", false }
@@ -840,6 +840,12 @@ void WrapperExtension::ConnectLogin()
 	}
 }
 
+// Callback for EOS_Connect_CreateUser() that forwards to WrapperExtension::OnConnectCreateUserCallback()
+void EOS_CALL ConnectCreateUserCallbackFn(const EOS_Connect_CreateUserCallbackInfo* Data)
+{
+	static_cast<WrapperExtension*>(Data->ClientData)->OnConnectCreateUserCallback(Data);
+}
+
 void WrapperExtension::OnConnectLoginCallback(const EOS_Connect_LoginCallbackInfo* Data)
 {
 	if (Data->ResultCode == EOS_EResult::EOS_Success)
@@ -849,9 +855,35 @@ void WrapperExtension::OnConnectLoginCallback(const EOS_Connect_LoginCallbackInf
 		// Save the product user ID for use with achievements
 		sharedHandles.productUserId = Data->LocalUserId;
 	}
+	else if (Data->ResultCode == EOS_EResult::EOS_InvalidUser)
+	{
+		LogMessage("OnConnectLoginCallback: creating user");
+
+		// Note always resolve by calling EOS_Connect_CreateUser. (Support for linking accounts is not currently implemented.)
+		EOS_Connect_CreateUserOptions Options = {};
+		Options.ApiVersion = EOS_CONNECT_CREATEUSER_API_LATEST;
+		Options.ContinuanceToken = Data->ContinuanceToken;
+
+		EOS_Connect_CreateUser(hConnect, &Options, this, ConnectCreateUserCallbackFn);
+	}
 	else
 	{
 		LogMessage("OnConnectLoginCallback: failed");
+	}
+}
+
+void WrapperExtension::OnConnectCreateUserCallback(const EOS_Connect_CreateUserCallbackInfo* Data)
+{
+	if (Data->ResultCode == EOS_EResult::EOS_Success)
+	{
+		LogMessage("OnConnectCreateUserCallback: success");
+
+		// Save the product user ID for use with achievements
+		sharedHandles.productUserId = Data->LocalUserId;
+	}
+	else
+	{
+		LogMessage("OnConnectCreateUserCallback: failed");
 	}
 }
 

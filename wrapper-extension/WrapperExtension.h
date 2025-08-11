@@ -55,6 +55,7 @@ public:
 
 	void ConnectLogin();
 	void OnConnectLoginCallback(const EOS_Connect_LoginCallbackInfo* Data);
+	void OnConnectCreateUserCallback(const EOS_Connect_CreateUserCallbackInfo* Data);
 	void OnConnectAuthExpiration(const EOS_Connect_AuthExpirationCallbackInfo* Data);
 
 protected:
